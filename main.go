@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 )
 
 const (
@@ -17,21 +18,34 @@ type block struct {
 
 func main() {
 	file := flag.String("in", "", "")
-	key := flag.String("key", "", "")
+	keyStr := flag.String("key", "", "")
 	enc := flag.Bool("encode", false, "")
 	denc := flag.Bool("decode", false, "")
 	out := flag.String("out", "", "")
+	hash := flag.Bool("hash", false, "")
 
 	flag.Parse()
 
-	if enc == denc {
+	if *enc == *denc {
 		log.Fatal("Неправильные аргументы")
 	}
+	if *keyStr == "" {
+		log.Fatal("Отсутствует ключ: -key examplekey")
+	}
+
+	dir, _ := os.Getwd()
+	if *hash && *enc {
+		log.Println("Создание хеш файла...")
+		makeHashFile(*file, *out+".hash", dir)
+	}
+
+	key := to16Bytes(*keyStr)
 
 	if *enc {
-		encode(*file, *out, []byte(*key))
+		encode(*file, *out, key)
 	}
 	if *denc {
-		decode(*file, *out, []byte(*key))
+		decode(*file, *out, key)
+		checkHashFile(*out, *file+".hash", dir, dir)
 	}
 }

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -173,5 +176,86 @@ func writeBlocksInOrder(outputChan <-chan block, outFile *os.File) {
 				break
 			}
 		}
+	}
+}
+
+func to16Bytes(s string) []byte {
+	b := []byte(s)
+
+	if len(b) > 16 {
+		return b[:16]
+	}
+
+	if len(b) < 16 {
+		padded := make([]byte, 16)
+		copy(padded, b)
+		return padded
+	}
+
+	return b
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil || !os.IsNotExist(err)
+}
+
+func checkHashFile(filename, hash_filename, hash_folder, file_folder string) {
+	log.Println("Проверка хеша...")
+	if !fileExists(filepath.Join(hash_folder, hash_filename)) {
+		log.Println("Хеш файла не найден")
+		return
+	}
+
+	hashBefore, err := os.ReadFile(filepath.Join(hash_folder, hash_filename))
+	if err != nil {
+		panic(err)
+	}
+
+	file, err := os.Open(filepath.Join(file_folder, filename))
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	_, err = io.Copy(hasher, file)
+	if err != nil {
+		panic(err)
+	}
+	hashAfter := hasher.Sum(nil)
+
+	equal := bytes.Equal(hashBefore, hashAfter)
+
+	if equal {
+		log.Println("Хеш проверка пройдена")
+	} else {
+		log.Println("Хеш проверка провалена")
+	}
+}
+
+func makeHashFile(filename, hash_filename, folder string) {
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	_, err = io.Copy(hasher, file)
+	if err != nil {
+		panic(err)
+	}
+
+	hash_sum := hasher.Sum(nil)
+	hash_file, err := os.Create(filepath.Join(folder, hash_filename))
+	if err != nil {
+		panic(err)
+	}
+	defer hash_file.Close()
+
+	_, err = hash_file.Write(hash_sum)
+	if err != nil {
+		panic(err)
 	}
 }
